@@ -6,3 +6,4 @@ kamailio_exporter.exe
 *.test
 *.mprof
 *-stamp
+*.vscode

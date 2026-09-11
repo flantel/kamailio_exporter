@@ -61,6 +61,32 @@ You can configure the exporter using the following flags:
 - `--log.format`: Output format of log messages. One of: [`logfmt`, `json`]. Defaults to `logfmt`.
 - `--[no-]version`: Show application version.
 
+#### Passing many flags with an arguments file
+
+Repeatable flags such as `--collector.dispatcher.mapping` quickly make for an unwieldy command line, and any value containing a space (`"200:Carrier 1"`) has to survive shell quoting intact all the way to the exporter. Where the quotes get lost along the way — a systemd unit that expands an unquoted `$ARGS` variable is the classic case, since systemd word-splits the expansion without honouring quotes — the value is split on whitespace and the exporter rejects the leftover words with an error such as `error: unexpected Carrier, try --help`.
+
+To sidestep quoting entirely, put the flags in a file, one argument per line, and pass the file prefixed with `@`. Each line is used verbatim, so no quotes are needed:
+
+```
+# /etc/kamailio_exporter/args.conf
+--kamailio.binrpc-uri=tcp://127.0.0.1:2047
+--collector.dispatcher.mapping=200:Carrier 1
+--collector.dispatcher.mapping=400:Carrier 2
+--collector.dialog.profiles=PROVIDER_A_IN
+```
+
+```sh
+kamailio_exporter @/etc/kamailio_exporter/args.conf
+```
+
+Blank lines and lines starting with `#` are ignored. The `@` has to be the first character of its own argument, and the path is resolved relative to the exporter's working directory, so use an absolute path when running under systemd:
+
+```ini
+ExecStart=/usr/bin/kamailio_exporter @/etc/kamailio_exporter/args.conf
+```
+
+Flags given on the command line and in an arguments file can be mixed freely.
+
 Test that the exporter is running and can collect metrics from Kamailio using the following command: `curl -s http://localhost:9494/metrics | grep kamailio_up`.
 The output should return this:
 
@@ -261,6 +287,7 @@ kamailio_tls_max_connections 16384
 These metrics are generated from the `dispatcher.list` command.
 Use the `--collector.dispatcher.mapping` flag to map a dispatcher Set ID to a Name using the `"ID:NAME"` format. You will need to repeat the option for each mapping. As an example: `kamailio_exporter --collector.dispatcher.mapping="200:Carrier 1" --collector.dispatcher.mapping="400:Carrier 2"`.
 Without this option the `set_name` label will always be set to blank.
+With more than a handful of sets, an [arguments file](#passing-many-flags-with-an-arguments-file) is easier to manage than a long command line, and avoids quoting set names that contain spaces.
 
 ```
 # HELP kamailio_dispatcher_list_target Target status.
